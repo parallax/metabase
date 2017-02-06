@@ -35,7 +35,7 @@
   :setter (fn [new-value]
             (when (seq new-value)
               (assert (re-matches #"[0-9a-f]{64}" new-value)
-                "Invalid embedding-secret-key! Secret key must be a hexadecimal-encoded 32-byte sequence (i.e., a 64-character string)."))
+                "Invalid embedding-secret-key! Secret key must be a hexadecimal-encoded 256-bit key (i.e., a 64-character string)."))
             (setting/set-string! :embedding-secret-key new-value)))
 
 
@@ -49,46 +49,50 @@
       (throw (ex-info (str "Token is missing value for keypath" keyseq) {:status-code 400}))))
 
 
+;;; ------------------------------------------------------------ Param Util Fns ------------------------------------------------------------
+
+
 (defn- remove-token-parameters
   "Removes any parameters with slugs matching keys provided in token-params, as these should not be exposed to the user."
   [dashboard-or-card token-params]
-  (assoc dashboard-or-card :parameters (filter #(not (contains? token-params (keyword (:slug %)))) (:parameters dashboard-or-card))))
+  (update dashboard-or-card :parameters (partial remove (comp (partial contains? token-params) keyword :slug)))) ; grab :slug, convert to kw, remove if in token-params
 
 (defn- template-tag-parameters
   "Transforms native query's `template_tags` into `parameters`."
   [card]
   ;; NOTE: this should mirror `getTemplateTagParameters` in frontend/src/metabase/meta/Parameter.js
-  (->> (get-in card [:dataset_query :native :template_tags])
-       (vals)
-       (filter #(and (not (nil? (:type %))) (not= (:type %) "dimension")))
-       (map (fn [tag] {:id      (:id tag),
-                       :type    (if (= (:type tag) "date") "date/single" "category")
-                       :target  ["variable" ["template-tag" (:name tag)]],
-                       :name    (:display_name tag)
-                       :slug    (:name tag)
-                       :default (:default tag)}))))
+  (for [[_ {tag-type :type, :as tag}] (get-in card [:dataset_query :native :template_tags])
+        :when                         (and tag-type
+                                           (not= tag-type "dimension"))]
+    {:id      (:id tag),
+     :type    (if (= tag-type "date") "date/single" "category")
+     :target  ["variable" ["template-tag" (:name tag)]]
+     :name    (:display_name tag)
+     :slug    (:name tag)
+     :default (:default tag)}))
 
 
 (defn- add-implicit-card-parameters
   [card]
-  (assoc card :parameters (concat (:parameters card) (template-tag-parameters card))))
+  (update card :parameters concat (template-tag-parameters card)))
 
 
 (defn- apply-parameter-values
   "Adds `value` to parameters with `slug` matching a key in `parameter-values` and removes parameters without a `value`"
   [parameters parameter-values]
-  (->> parameters
-    (map #(assoc % :value (get parameter-values (keyword (:slug %)))))
-    (map #(select-keys % [:type :target :value]))
-    (remove #(nil? (:value %)))))
+  (for [param parameters
+        :let  [value (get parameter-values (keyword (:slug param)))]
+        :when (not (nil? value))]
+    (assoc (select-keys param [:type :target])
+      :value value)))
 
 
 (defn- resolve-card-parameters
   "Returns parameters for a card"
   [card-id]
-  (-> (db/select-one [Card :dataset_query] :id card-id)
+  (-> (db/select-one [Card :dataset_query], :id card-id)
       (add-implicit-card-parameters)
-      (:parameters)))
+      :parameters))
 
 
 (defn- resolve-dashboard-parameters
@@ -101,6 +105,7 @@
          (filter #(= card-id (:card_id %)))
          (map #(assoc (get parameters (:parameter_id %)) :target (:target %)))
          (remove nil?))))
+
 
 ;;; ------------------------------------------------------------ Cards ------------------------------------------------------------
 
