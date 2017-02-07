@@ -34,6 +34,8 @@
    :collection_id     nil
    :description       nil
    :display           "scalar"
+   :enable_embedding  false
+   :embedding_params  nil
    :made_public_by_id nil
    :public_uuid       nil
    :query_type        "query"})
@@ -65,6 +67,11 @@
   ((user->client :crowberto) :get 400 "card" :f :database))
 
 ;; Filter cards by table
+(defn- card-returned? [table-id card-id]
+  (contains? (set (for [card ((user->client :rasta) :get 200 "card", :f :table, :model_id table-id)]
+                    (u/get-id card)))
+             card-id))
+
 (expect
   [true
    false
@@ -74,13 +81,9 @@
                   Table    [{table-2-id :id}  {:db_id database-id}]
                   Card     [{card-1-id :id}   {:table_id table-1-id}]
                   Card     [{card-2-id :id}   {:table_id table-2-id}]]
-    (let [card-returned? (fn [table-id card-id]
-                           (contains? (set (for [card ((user->client :rasta) :get 200 "card", :f :table, :model_id table-id)]
-                                             (u/get-id card)))
-                                      card-id))]
-      [(card-returned? table-1-id card-1-id)
-       (card-returned? table-2-id card-1-id)
-       (card-returned? table-2-id card-2-id)])))
+    [(card-returned? table-1-id card-1-id)
+     (card-returned? table-2-id card-1-id)
+     (card-returned? table-2-id card-2-id)]))
 
 ;; Make sure `id` is required when `f` is :table
 (expect {:errors {:id "id is required parameter when filter mode is 'table'"}}
@@ -154,7 +157,7 @@
 ;; Test that we can make a card
 (let [card-name (random-name)]
   (tt/expect-with-temp [Database [{database-id :id}]
-                     Table    [{table-id :id}  {:db_id database-id}]]
+                        Table    [{table-id :id}  {:db_id database-id}]]
     (merge card-defaults
            {:name                   card-name
             :creator_id             (user->id :rasta)
