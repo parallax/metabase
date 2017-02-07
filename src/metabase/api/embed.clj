@@ -14,10 +14,11 @@
       {:resource {:question  <card-id>
                   :dashboard <dashboard-id>}
        :params   <params>}"
+  ;; TODO - switch resource.question back to resource.card
   (:require [clojure.tools.logging :as log]
             [buddy.sign.jwt :as jwt]
             [compojure.core :refer [GET]]
-            (toucan [db :as db])
+            [toucan.db :as db]
             (metabase.api [common :as api]
                           [dataset :as dataset-api]
                           [public :as public-api])
@@ -47,6 +48,17 @@
 (defn- get-in-unsigned-token-or-throw [unsigned-token keyseq]
   (or (get-in unsigned-token keyseq)
       (throw (ex-info (str "Token is missing value for keypath" keyseq) {:status-code 400}))))
+
+(defn- check-embedding-enabled [object]
+  (api/check-404 object)
+  (api/check (:enable_embedding object)
+    [400 "Embedding is not enabled for this object."]))
+
+(defn- check-embedding-enable-for-dashboard [dashboard-id]
+  (check-embedding-enabled (db/select-one [Dashboard :enable_embedding] :id dashboard-id)))
+
+(defn- check-embedding-enable-for-card [card-id]
+  (check-embedding-enabled (db/select-one [Card :enable_embedding] :id card-id)))
 
 
 ;;; ------------------------------------------------------------ Param Util Fns ------------------------------------------------------------
@@ -88,10 +100,10 @@
 
 
 (defn- resolve-card-parameters
-  "Returns parameters for a card"
+  "Returns parameters for a card" ; TODO - better docstring
   [card-id]
   (-> (db/select-one [Card :dataset_query], :id card-id)
-      (add-implicit-card-parameters)
+      add-implicit-card-parameters
       :parameters))
 
 
@@ -119,8 +131,8 @@
   (let [unsigned-token (unsign token)
         id             (get-in-unsigned-token-or-throw unsigned-token [:resource :question])
         token-params   (get-in-unsigned-token-or-throw unsigned-token [:params])]
-    (-> (public-api/public-card :id id)
-        (add-implicit-card-parameters)
+    (-> (public-api/public-card :id id, :enable_embedding true)
+        add-implicit-card-parameters
         (remove-token-parameters token-params))))
 
 
@@ -130,6 +142,7 @@
         ;; TODO: validate required signed parameters are present in token-params (once that is configurable by the admin)
         parameter-values (merge query-params token-params)
         parameters       (apply-parameter-values (resolve-card-parameters card-id) parameter-values)]
+    (check-embedding-enable-for-card card-id)
     (apply public-api/run-query-for-card-with-id card-id parameters options)))
 
 
@@ -168,7 +181,7 @@
   (let [unsigned     (unsign token)
         id           (get-in-unsigned-token-or-throw unsigned [:resource :dashboard])
         token-params (get-in-unsigned-token-or-throw unsigned [:params])]
-    (-> (public-api/public-dashboard :id id)
+    (-> (public-api/public-dashboard :id id, :enable_embedding true)
         (remove-token-parameters token-params))))
 
 
@@ -188,6 +201,7 @@
         ;; TODO: validate required signed parameters are present in token-params (once that is configurable by the admin)
         parameter-values (merge query-params token-params)
         parameters       (apply-parameter-values (resolve-dashboard-parameters dashboard-id dashcard-id card-id) parameter-values)]
+    (check-embedding-enabled-for-dashboard dashboard-id)
     (public-api/public-dashcard-results dashboard-id card-id parameters)))
 
 
