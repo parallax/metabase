@@ -241,7 +241,7 @@ export default class Dashboard extends Component {
                     setEditingParameter={this.props.setEditingParameter}
 
                     setParameterName={this.props.setParameterName}
-                    setDefaultValue={this.props.setParameterDefaultValue}
+                    setParameterDefaultValue={this.props.setParameterDefaultValue}
                     removeParameter={this.props.removeParameter}
                     setParameterValue={this.props.setParameterValue}
                 />
@@ -269,7 +269,7 @@ export default class Dashboard extends Component {
                         />
                     </header>
                     {!isFullscreen && parameters &&
-                        <div className="wrapper flex flex-column align-start mt1">
+                        <div className="wrapper flex flex-column align-start mt1 relative z2">
                             {parameters}
                         </div>
                     }
