@@ -12,6 +12,7 @@ import VisualizationResult from "./VisualizationResult.jsx";
 import Warnings from "./Warnings.jsx";
 import QueryDownloadWidget from "./QueryDownloadWidget.jsx";
 import QuestionShareWidget from "../containers/QuestionShareWidget";
+import QuestionEmbedWidget from "../containers/QuestionEmbedWidget";
 
 import { formatNumber, inflect } from "metabase/lib/formatting";
 import Utils from "metabase/lib/utils";
@@ -118,6 +119,13 @@ export default class QueryVisualization extends Component {
                             className="mx1"
                             card={card}
                             isAdmin={isAdmin}
+                        />
+                    : null }
+                    {/* FIXME: change isPublicLinksEnabled to isEmbeddingEnabled */}
+                    { isSaved && isPublicLinksEnabled && isAdmin ?
+                        <QuestionEmbedWidget
+                            className="mx1"
+                            card={card}
                         />
                     : null }
                 </div>
