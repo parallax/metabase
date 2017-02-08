@@ -54,10 +54,10 @@
   (api/check (:enable_embedding object)
     [400 "Embedding is not enabled for this object."]))
 
-(defn- check-embedding-enable-for-dashboard [dashboard-id]
+(defn- check-embedding-enabled-for-dashboard [dashboard-id]
   (check-embedding-enabled (db/select-one [Dashboard :enable_embedding] :id dashboard-id)))
 
-(defn- check-embedding-enable-for-card [card-id]
+(defn- check-embedding-enabled-for-card [card-id]
   (check-embedding-enabled (db/select-one [Card :enable_embedding] :id card-id)))
 
 
@@ -142,7 +142,7 @@
         ;; TODO: validate required signed parameters are present in token-params (once that is configurable by the admin)
         parameter-values (merge query-params token-params)
         parameters       (apply-parameter-values (resolve-card-parameters card-id) parameter-values)]
-    (check-embedding-enable-for-card card-id)
+    (check-embedding-enabled-for-card card-id)
     (apply public-api/run-query-for-card-with-id card-id parameters options)))
 
 

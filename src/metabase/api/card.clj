@@ -222,13 +222,14 @@
 
 (defendpoint PUT "/:id"
   "Update a `Card`."
-  [id :as {{:keys [dataset_query description display name visualization_settings archived collection_id], :as body} :body}]
+  [id :as {{:keys [dataset_query description display name visualization_settings archived collection_id enable_embedding], :as body} :body}]
   {name                   (s/maybe su/NonBlankString)
    dataset_query          (s/maybe su/Map)
    display                (s/maybe su/NonBlankString)
    description            (s/maybe su/NonBlankString)
    visualization_settings (s/maybe su/Map)
    archived               (s/maybe s/Bool)
+   enable_embedding       (s/maybe s/Bool)
    collection_id          (s/maybe su/IntGreaterThanZero)}
   (let [card (write-check Card id)]
     ;; if we're changing the `collection_id` of the Card, make sure we have write permissions for the new group
@@ -242,15 +243,18 @@
     (when (and (false? archived)
                (:archived card))
       (check-data-permissions-for-query (:dataset_query card)))
+    ;; you must be a superuser to toggle the value of `enable_embedding`
+    (when-not (nil? enable_embedding)
+      (when (not= enable_embedding (:enable_embedding card))
+        (check-superuser)))
     ;; ok, now save the Card
     (db/update! Card id
-      (merge (when (contains? body :collection_id)   {:collection_id          collection_id})
-             (when-not (nil? dataset_query)          {:dataset_query          dataset_query})
-             (when-not (nil? description)            {:description            description})
-             (when-not (nil? display)                {:display                display})
-             (when-not (nil? name)                   {:name                   name})
-             (when-not (nil? visualization_settings) {:visualization_settings visualization_settings})
-             (when-not (nil? archived)               {:archived               archived})))
+      (merge (when (contains? body :collection_id)
+               {:collection_id collection_id})
+             (into {} (for [k     [:dataset_query :description :display :name :visualization_settings :archived :enable_embedding]
+                            :let  [v (k body)]
+                            :when (not (nil? v))]
+                        {k v}))))
     (let [event (cond
                   ;; card was archived
                   (and archived
