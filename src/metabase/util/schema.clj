@@ -122,7 +122,6 @@
 
 (def EmbeddingParams
   "Schema for a valid map of embedding params."
-  (with-api-error-message (s/named {s/Keyword (s/cond-pre {:value s/Any}
-                                                          s/Bool)}
+  (with-api-error-message (s/named {s/Keyword (s/enum "disabled" "enabled" "locked")}
                                    "valid embedding params map")
     "value must be a valid embedding params map."))

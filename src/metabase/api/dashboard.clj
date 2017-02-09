@@ -118,6 +118,7 @@
       (events/publish-event! :dashboard-add-cards {:id id, :actor_id *current-user-id*, :dashcards [<>]}))))
 
 
+;; TODO - we should use schema to validate the format of the Cards :D
 (defendpoint PUT "/:id/cards"
   "Update `Cards` on a `Dashboard`. Request body should have the form:
 
