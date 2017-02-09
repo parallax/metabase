@@ -6,6 +6,7 @@
                         [nonce :as nonce])
             [clojure.tools.logging :as log]
             [environ.core :as env]
+            [ring.util.codec :as codec]
             [metabase.util :as u]))
 
 (defonce ^:private secret-key
@@ -27,13 +28,13 @@
   "Encrypt string S as hex bytes using the `MB_ENCRYPTION_SECRET_KEY`."
   ^String [^String s]
   (let [iv (nonce/random-bytes 16)]
-    (str (codecs/bytes->hex iv)
-         (codecs/bytes->hex (crypto/encrypt (codecs/to-bytes s) secret-key iv {:algorithm :aes256-cbc-hmac-sha512})))))
+    (codec/base64-encode (byte-array (concat iv
+                                             (crypto/encrypt (codecs/to-bytes s) secret-key iv {:algorithm :aes256-cbc-hmac-sha512}))))))
 
 (defn decrypt
   "Decrypt string S  using the `MB_ENCRYPTION_SECRET_KEY`."
   ^String [^String s]
-  (let [bytes        (codecs/hex->bytes s)
+  (let [bytes        (codec/base64-decode s)
         [iv message] (split-at 16 bytes)]
     (codecs/bytes->str (crypto/decrypt (byte-array message) secret-key (byte-array iv) {:algorithm :aes256-cbc-hmac-sha512}))))
 
