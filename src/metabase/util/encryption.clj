@@ -9,39 +9,48 @@
             [ring.util.codec :as codec]
             [metabase.util :as u]))
 
-(defonce ^:private secret-key
+(defn secret-key->hash
+  "Generate a 64-byte byte array hash of SECRET-KEY using 100,000 iterations of PBKDF2+SHA512."
+  [^String secret-key]
+  (kdf/get-bytes (kdf/engine {:alg        :pbkdf2+sha512
+                              :secret     (env/env :mb-encryption-secret-key)
+                              :iterations 100000}) ; 100,000 iterations takes about ~160ms on my laptop
+                 64))
+
+(defonce ^:private default-secret-key
   (when-let [secret-key (env/env :mb-encryption-secret-key)]
     (when (seq secret-key)
       (assert (>= (count secret-key) 16)
         "MB_ENCRYPTION_SECRET_KEY must be at least 16 characters.")
-      (kdf/get-bytes (kdf/engine {:alg        :pbkdf2+sha512
-                                  :secret     (env/env :mb-encryption-secret-key)
-                                  :iterations 100000}) ; 100,000 iterations takes about ~160ms on my laptop
-                     64))))
+      (secret-key->hash secret-key))))
 
 ;; log a nice message letting people know whether DB details encryption is enabled
 (log/info (format "DB details encryption is %s for this Metabase instance. %s"
-                  (if secret-key "ENABLED" "DISABLED")
-                  (u/emoji (if secret-key "🔐" "🔓"))))
+                  (if default-secret-key "ENABLED" "DISABLED")
+                  (u/emoji (if default-secret-key "🔐" "🔓"))))
 
 (defn encrypt
-  "Encrypt string S as hex bytes using the `MB_ENCRYPTION_SECRET_KEY`."
-  ^String [^String s]
-  (let [iv (nonce/random-bytes 16)]
-    (codec/base64-encode (byte-array (concat iv
-                                             (crypto/encrypt (codecs/to-bytes s) secret-key iv {:algorithm :aes256-cbc-hmac-sha512}))))))
+  "Encrypt string S as hex bytes using a SECRET-KEY (a 64-byte byte array), by default the hashed value of `MB_ENCRYPTION_SECRET_KEY`."
+  (^String [^String s]
+   (encrypt default-secret-key s))
+  (^String [^String secret-key, ^String s]
+   (let [iv (nonce/random-bytes 16)]
+     (codec/base64-encode (byte-array (concat iv
+                                              (crypto/encrypt (codecs/to-bytes s) secret-key iv {:algorithm :aes256-cbc-hmac-sha512})))))))
 
 (defn decrypt
-  "Decrypt string S  using the `MB_ENCRYPTION_SECRET_KEY`."
-  ^String [^String s]
-  (let [bytes        (codec/base64-decode s)
-        [iv message] (split-at 16 bytes)]
-    (codecs/bytes->str (crypto/decrypt (byte-array message) secret-key (byte-array iv) {:algorithm :aes256-cbc-hmac-sha512}))))
+  "Decrypt string S  using a SECRET-KEY (a 64-byte byte array), by default the hashed value of `MB_ENCRYPTION_SECRET_KEY`."
+  (^String [^String s]
+   (decrypt default-secret-key s))
+  (^String [secret-key, ^String s]
+   (let [bytes        (codec/base64-decode s)
+         [iv message] (split-at 16 bytes)]
+     (codecs/bytes->str (crypto/decrypt (byte-array message) secret-key (byte-array iv) {:algorithm :aes256-cbc-hmac-sha512})))))
 
 (defn maybe-encrypt
   "If `MB_ENCRYPTION_SECRET_KEY` is set, return an encrypted version of S; otherwise return S as-is."
   ^String [^String s]
-  (if secret-key
+  (if default-secret-key
     (when (seq s)
       (encrypt s))
     s))
@@ -49,7 +58,7 @@
 (defn maybe-decrypt
   "If `MB_ENCRYPTION_SECRET_KEY` is set and S is encrypted, decrypt S; otherwise return S as-is."
   ^String [^String s]
-  (if secret-key
+  (if default-secret-key
     (when (seq s)
       (try (decrypt s)
            ;; if for some reason we we're able to decrypt S it's probably because it wasn't encrypted in the first place, just return as-is
