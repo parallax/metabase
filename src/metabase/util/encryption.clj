@@ -2,7 +2,7 @@
   "Utility functions for encrypting and decrypting strings using AES256 CBC + HMAC SHA512 and the `MB_ENCRYPTION_SECRET_KEY` env var."
   (:require (buddy.core [codecs :as codecs]
                         [crypto :as crypto]
-                        [hash :as hash]
+                        [kdf :as kdf]
                         [nonce :as nonce])
             [clojure.tools.logging :as log]
             [environ.core :as env]
@@ -11,7 +11,12 @@
 (defonce ^:private secret-key
   (when-let [secret-key (env/env :mb-encryption-secret-key)]
     (when (seq secret-key)
-      (hash/sha512 secret-key))))
+      (assert (>= (count secret-key) 16)
+        "MB_ENCRYPTION_SECRET_KEY must be at least 16 characters.")
+      (kdf/get-bytes (kdf/engine {:alg        :pbkdf2+sha512
+                                  :secret     (env/env :mb-encryption-secret-key)
+                                  :iterations 100000}) ; 100,000 iterations takes about ~160ms on my laptop
+                     64))))
 
 ;; log a nice message letting people know whether DB details encryption is enabled
 (log/info (format "DB details encryption is %s for this Metabase instance. %s"
