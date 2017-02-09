@@ -90,7 +90,7 @@
 
 (defn update-dashboard!
   "Update a `Dashboard`"
-  [{:keys [id name description parameters caveats points_of_interest show_in_getting_started enable_embedding], :as dashboard} user-id]
+  [{:keys [id name description parameters caveats points_of_interest show_in_getting_started enable_embedding embedding_params], :as dashboard} user-id]
   {:pre [(map? dashboard)
          (integer? id)
          (u/maybe? u/sequence-of-maps? parameters)
@@ -102,6 +102,7 @@
     :caveats                 caveats
     :points_of_interest      points_of_interest
     :enable_embedding        enable_embedding
+    :embedding_params        embedding_params
     :show_in_getting_started show_in_getting_started)
   (u/prog1 (Dashboard id)
     (events/publish-event! :dashboard-update (assoc <> :actor_id user-id))))

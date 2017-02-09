@@ -76,7 +76,7 @@
   (for [[_ {tag-type :type, :as tag}] (get-in card [:dataset_query :native :template_tags])
         :when                         (and tag-type
                                            (not= tag-type "dimension"))]
-    {:id      (:id tag),
+    {:id      (:id tag)
      :type    (if (= tag-type "date") "date/single" "category")
      :target  ["variable" ["template-tag" (:name tag)]]
      :name    (:display_name tag)
@@ -101,8 +101,8 @@
 
 (defn- resolve-card-parameters
   "Returns parameters for a card" ; TODO - better docstring
-  [card-id]
-  (-> (db/select-one [Card :dataset_query], :id card-id)
+  [card-or-id]
+  (-> (db/select-one [Card :dataset_query], :id (u/get-id card-or-id))
       add-implicit-card-parameters
       :parameters))
 

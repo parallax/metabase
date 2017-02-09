@@ -71,19 +71,22 @@
 
    Usually, you just need write permissions for this Dashboard to do this (which means you have appropriate permissions for the Cards belonging to this Dashboard),
    but to change the value of `enable_embedding` you must be a superuser."
-  [id :as {{:keys [description name parameters caveats points_of_interest show_in_getting_started enable_embedding], :as dashboard} :body}]
+  [id :as {{:keys [description name parameters caveats points_of_interest show_in_getting_started enable_embedding embedding_params], :as dashboard} :body}]
   {name                    su/NonBlankString
    description             (s/maybe su/NonBlankString)
    caveats                 (s/maybe su/NonBlankString)
    points_of_interest      (s/maybe su/NonBlankString)
    show_in_getting_started (s/maybe su/NonBlankString)
    enable_embedding        (s/maybe s/Bool)
+   embedding_params        (s/maybe su/EmbeddingParams)
    parameters              [su/Map]}
   (let [dash (write-check Dashboard id)]
-    ;; you must be a superuser to toggle the value of `enable_embedding`
-    (when-not (nil? enable_embedding)
-      (when (not= enable_embedding (:enable_embedding dash))
-        (check-superuser))))
+    ;; you must be a superuser to change the value of `enable_embedding` or `embedding_params`.
+    (when (or (and (not (nil? enable_embedding))
+                   (not= enable_embedding (:enable_embedding dash)))
+              (and embedding_params
+                   (not= embedding_params (:embedding_params dash))))
+      (check-superuser)))
   (check-500 (-> (assoc dashboard :id id)
                  (dashboard/update-dashboard! *current-user-id*))))
 
