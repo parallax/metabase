@@ -14,6 +14,8 @@ import { getParametersBySlug } from "metabase/meta/Parameter";
 import type { Card } from "metabase/meta/types/Card";
 import type { Dataset } from "metabase/meta/types/Dataset";
 
+import { getParameters, applyParameters } from "metabase/meta/Card";
+
 import { PublicApi, EmbedApi } from "metabase/services";
 
 import { setErrorPage } from "metabase/redux/app";
@@ -38,17 +40,6 @@ const mapDispatchToProps = {
     setErrorPage
 };
 
-// returns either the public or embed API depending on if token or uuid is provided
-function Api(params) {
-    if (params.token) {
-        return EmbedApi;
-    } else if (params.uuid) {
-        return PublicApi;
-    } else {
-        throw { status: 404 };
-    }
-}
-
 @connect(null, mapDispatchToProps)
 @ExplicitSize
 export default class PublicQuestion extends Component<*, Props, State> {
@@ -66,17 +57,25 @@ export default class PublicQuestion extends Component<*, Props, State> {
 
     // $FlowFixMe
     async componentWillMount() {
-        const { setErrorPage, params, location: { query }} = this.props;
+        const { setErrorPage, params: { uuid, token }, location: { query }} = this.props;
         try {
-            let card = await Api(params).card(params);
+            let card;
+            if (token) {
+                card = await EmbedApi.card({ token });
+            } else if (uuid) {
+                card = await PublicApi.card({ uuid });
+            } else {
+                throw { status: 404 }
+            }
 
             let parameterValues = {};
-            for (let parameter of card.parameters) {
+            for (let parameter of getParameters(card)) {
                 parameterValues[parameter.id] = query[parameter.slug];
             }
 
             this.setState({ card, parameterValues }, this.run);
         } catch (error) {
+            console.error("error", error)
             setErrorPage(error);
         }
     }
@@ -92,22 +91,37 @@ export default class PublicQuestion extends Component<*, Props, State> {
 
     // $FlowFixMe: setState expects return type void
     run = async (): void => {
-        const { setErrorPage, params } = this.props;
+        const { setErrorPage, params: { uuid, token } } = this.props;
         const { card, parameterValues } = this.state;
 
         if (!card) {
             return;
         }
 
+        const parameters = getParameters(card);
+
         try {
-            const newResult = await Api(params).cardQuery({
-                ...params,
-                ...getParametersBySlug(card.parameters, parameterValues)
-            });
+            let newResult;
+            if (token) {
+                // embeds apply parameter values server-side
+                newResult = await EmbedApi.cardQuery({
+                    token,
+                    ...getParametersBySlug(parameters, parameterValues)
+                });
+            } else if (uuid) {
+                // public links currently apply parameters client-side
+                const datasetQuery = applyParameters(card, parameters, parameterValues);
+                newResult = await PublicApi.cardQuery({
+                    uuid,
+                    parameters: JSON.stringify(datasetQuery.parameters)
+                })
+            } else  {
+                throw { status: 404 };
+            }
 
             this.setState({ result: newResult });
         } catch (error) {
-            console.log("error", error)
+            console.error("error", error)
             setErrorPage(error);
         }
     }

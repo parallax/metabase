@@ -20,9 +20,10 @@ export default class EmbedWidget extends Component<*, Props> {
     props: Props;
 
     render() {
-        const { className, type, card } = this.props;
+        const { className, type } = this.props;
         return (
             <ModalWithTrigger
+                ref={m => this._modal = m}
                 full
                 triggerElement={
                     <Tooltip tooltip={`Embed this ${type}`}>
@@ -32,7 +33,11 @@ export default class EmbedWidget extends Component<*, Props> {
                 triggerClasses={cx(className, "text-brand-hover")}
                 className="scroll-y"
             >
-                <EmbedModal {...this.props} />
+                <EmbedModal
+                    {...this.props}
+                    onClose={() => this._modal.close()}
+                    className="full-height"
+                />
             </ModalWithTrigger>
         );
     }

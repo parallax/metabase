@@ -30,38 +30,42 @@ export default class EmbedModal extends Component<*, Props, State> {
         this.state = {
             pane: "preview",
             secure: false,
-            parameters: {}
+            parameters: {},
+            displayOptions: {
+                theme: null,
+                bordered: true
+            }
         };
     }
 
     static defaultProps = {};
 
     render() {
-        const { card, type } = this.props;
-        const { pane, secure, parameters } = this.state;
+        const { className, card, type } = this.props;
+        const { pane, secure, parameters, displayOptions } = this.state;
 
         let iframeUrl;
         if (secure) {
-            iframeUrl = getSignedPreviewUrl(siteUrl, type, card.id, {}, secretKey);
+            iframeUrl = getSignedPreviewUrl(siteUrl, type, card.id, {}, displayOptions, secretKey);
         } else {
-            iframeUrl = getUnsignedPreviewUrl(siteUrl, type, card.public_uuid);
+            iframeUrl = getUnsignedPreviewUrl(siteUrl, type, card.public_uuid, displayOptions);
         }
         const token = getSignedToken(type, card.id, {}, secretKey);
 
         return (
             <div
-                className={cx("spread flex p4", { "bg-brand": pane === "preview" })}
+                className={cx(className, "flex-full flex flex-column p4", { "bg-brand": pane === "preview" })}
                 style={{ transition: "background-color 300ms linear" }}
             >
-                <div className={"flex-full mr4 flex flex-column"}>
-                    <ToggleLarge
-                        className="mb2"
-                        style={{ width: 244, height: 34 }}
-                        value={pane === "preview"}
-                        textLeft="Preview"
-                        textRight="Code"
-                        onChange={(e) => this.setState({ pane: pane === "preview" ? "code" : "preview" })}
-                    />
+                <ToggleLarge
+                    className="mb2"
+                    style={{ width: 244, height: 34 }}
+                    value={pane === "preview"}
+                    textLeft="Preview"
+                    textRight="Code"
+                    onChange={(e) => this.setState({ pane: pane === "preview" ? "code" : "preview" })}
+                />
+                <div className={"flex-full flex"}>
                     { pane === "preview" ?
                         <EmbedPreviewPane
                             className="flex-full"
@@ -69,6 +73,7 @@ export default class EmbedModal extends Component<*, Props, State> {
                         />
                     : pane === "code" ?
                         <EmbedCodePane
+                            className="flex-full"
                             secure={secure}
                             iframeUrl={iframeUrl}
                             token={token}
@@ -79,14 +84,18 @@ export default class EmbedModal extends Component<*, Props, State> {
                             params={{}}
                         />
                     : null }
+                    <div className="ml4">
+                        <EmbedSettingsPane
+                            card={card}
+                            secure={secure}
+                            onChangeSecure={(secure) => this.setState({ secure })}
+                            parameters={parameters}
+                            onChangeParameters={(parameters) => this.setState({ parameters })}
+                            displayOptions={displayOptions}
+                            onChangeDisplayOptions={(displayOptions) => this.setState({ displayOptions })}
+                        />
+                    </div>
                 </div>
-                <EmbedSettingsPane
-                    card={card}
-                    secure={secure}
-                    onChangeSecure={(secure) => this.setState({ secure })}
-                    parameters={parameters}
-                    onChangeParameters={(parameters) => this.setState({ parameters })}
-                />
             </div>
         );
     }

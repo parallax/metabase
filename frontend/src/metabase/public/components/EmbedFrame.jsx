@@ -12,6 +12,8 @@ import LogoBadge from "./LogoBadge";
 import querystring from "querystring";
 import cx from "classnames";
 
+import "./EmbedFrame.css";
+
 const DEFAULT_OPTIONS = {
     bordered: IFRAMED
 }
@@ -46,11 +48,12 @@ export default class EmbedFrame extends Component<*, Props, *> {
         const { className, children, actionButtons, name, location, parameters, parameterValues, setParameterValue } = this.props;
         const footer = true;
 
-        const { bordered } = this._getOptions()
+        const { bordered, theme } = this._getOptions()
 
         return (
-            <div className={cx("flex flex-column bg-white", className, {
-                "bordered rounded shadowed": bordered
+            <div className={cx("EmbedFrame flex flex-column", className, {
+                "bordered rounded shadowed": bordered,
+                [`Theme--${theme}`]: !!theme
             })}>
                 <div className="flex flex-column flex-full scroll-y relative">
                     <div className="flex align-center px1 pt1 pb0 sm-px2 sm-pt2 sm-pb0 lg-px3 lg-pt3 lg-pb1 bg-white">
